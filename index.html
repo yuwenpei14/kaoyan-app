@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>研路同行 - 考研全设备云同步系统 v2.2</title>
+    <title>研路同行 - 考研全设备云同步系统 v3.0</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -64,6 +64,13 @@
         .badge-status-2 { background-color: var(--success-color); }
         
         .time-badge { font-size: 12px; color: #7f8c8d; font-weight: 500; background: var(--bg-color); padding: 3px 8px; border-radius: 20px; }
+        .ebbinghaus-alert-badge { font-size: 12px; color: white; font-weight: bold; background: var(--danger-color); padding: 3px 8px; border-radius: 20px; animation: pulse 2s infinite; }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
         
         .image-wrapper { background: var(--bg-color); padding: 8px; border-radius: 8px; margin: 12px 0; display: inline-block; max-width: 100%; border: 1px dashed var(--border-color); }
         .q-display-img { max-width: 100%; max-height: 350px; border-radius: 6px; cursor: zoom-in; display: block; transition: transform 0.2s; }
@@ -105,7 +112,7 @@
 
     <div id="app-panel" class="app-container">
         <div class="sidebar">
-            <div class="logo">🎯 研路同行 v2.2</div>
+            <div class="logo">🎯 研路同行 v3.0</div>
             <ul class="nav-menu">
                 <li class="nav-item active" onclick="switchPage('dashboard', this)">📊 学习看板</li>
                 <li class="nav-item" onclick="switchPage('checkin', this)">📅 每日打卡</li>
@@ -228,7 +235,7 @@
                 </div>
 
                 <div class="card">
-                    <h3>我的云端题型本（支持科目与时间双重交叉筛选）</h3>
+                    <h3>我的云端题型本（支持艾宾浩斯抗遗忘智能检索）</h3>
                     
                     <div class="filters" style="margin-bottom:20px; display: flex; gap: 10px;">
                         <select id="filter-subject" class="form-control" onchange="fetchQuestions()" style="width:auto;">
@@ -241,10 +248,10 @@
                         
                         <select id="filter-time" class="form-control" onchange="fetchQuestions()" style="width:auto;">
                             <option value="全部">全部时间</option>
+                            <option value="艾宾浩斯到期">🚨 艾宾浩斯今日到期</option>
                             <option value="今天">今天收录</option>
                             <option value="近三天">近 3 天</option>
                             <option value="近一周">近一周</option>
-                            <option value="近一月">近一月</option>
                         </select>
                     </div>
                     
@@ -333,7 +340,6 @@
             loadStages();
             renderTodos();
             updateCountdown();
-            setInterval(updateCountdown, 1000);
         }
 
         async function submitCheckIn() {
@@ -383,8 +389,6 @@
                     if(!uploadError) {
                         const { data } = supabaseClient.storage.from('kaoyan-pics').getPublicUrl(fileName);
                         imageUrl = data.publicUrl;
-                    } else {
-                        alert("🔴 图片上传失败，原因：" + uploadError.message);
                     }
                 }
 
@@ -403,25 +407,23 @@
             finally { btn.innerText = "云端收录题型"; btn.disabled = false; }
         }
 
-        // 🌟 核心升级：科目与时间跨度双重交叉查询函数
+        // 🌟 核心升级：融合艾宾浩斯遗忘曲线过滤算法
         async function fetchQuestions() {
             try {
                 const subFilter = document.getElementById('filter-subject').value;
                 const timeFilter = document.getElementById('filter-time').value;
                 
-                // 初始化查询：按云端时间戳降序排列
                 let query = supabaseClient.from('questions').select('*').order('created_at', { ascending: false });
                 
-                // 1. 处理【科目】筛选条件
                 if(subFilter !== '全部') {
                     query = query.eq('subject', subFilter);
                 }
                 
-                // 2. 处理【时间段】范围筛选条件
-                if(timeFilter !== '全部') {
+                // 正常的固定时间段过滤
+                if(timeFilter !== '全部' && timeFilter !== '艾宾浩斯到期') {
                     const now = new Date();
                     if(timeFilter === '今天') {
-                        now.setHours(0,0,0,0); // 今天的 00:00:00 之后
+                        now.setHours(0,0,0,0);
                         query = query.gte('created_at', now.toISOString());
                     } else if(timeFilter === '近三天') {
                         const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
@@ -429,28 +431,51 @@
                     } else if(timeFilter === '近一周') {
                         const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
                         query = query.gte('created_at', cutoff.toISOString());
-                    } else if(timeFilter === '近一月') {
-                        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                        query = query.gte('created_at', cutoff.toISOString());
                     }
                 }
 
                 const { data, error } = await query;
                 if(!error && data) {
-                    document.getElementById('stat-questions').innerText = data.length;
                     const statusLabels = ["完全不会", "需重做", "已吃透"];
-                    
-                    // 无数据状态兜底友情提示
-                    if(data.length === 0) {
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    // 1. 动态给每一道题计算距离今天的遗忘天数差
+                    let processedData = data.map(q => {
+                        const qDate = new Date(q.created_at);
+                        qDate.setHours(0,0,0,0);
+                        // 计算相差整天数
+                        const diffDays = Math.round((today - qDate) / (1000 * 60 * 60 * 24));
+                        
+                        // 艾宾浩斯遗忘关键点数组（第1, 2, 4, 7, 15, 30天）
+                        const ebbinghausStages = [1, 2, 4, 7, 15, 30];
+                        const isDue = ebbinghausStages.includes(diffDays);
+                        
+                        return { ...q, diffDays, isDue };
+                    });
+
+                    // 2. 如果开启了艾宾浩斯筛选，强行过滤出今日触发临界点的错题
+                    if(timeFilter === '艾宾浩斯到期') {
+                        processedData = processedData.filter(q => q.isDue);
+                    }
+
+                    document.getElementById('stat-questions').innerText = processedData.length;
+
+                    if(processedData.length === 0) {
                         document.getElementById('question-list-container').innerHTML = `
-                            <p style="color:#7f8c8d; font-size:14px; text-align:center; padding: 30px 0;">📭 没有在这个时间段找到符合该科目的云端错题。</p>
+                            <p style="color:#7f8c8d; font-size:14px; text-align:center; padding: 30px 0;">📭 暂无触发遗忘曲线的复习到期题目，做得好！</p>
                         `;
                         return;
                     }
                     
-                    document.getElementById('question-list-container').innerHTML = data.map(q => {
+                    document.getElementById('question-list-container').innerHTML = processedData.map(q => {
                         const formattedTime = q.created_at ? new Date(q.created_at).toLocaleString('zh-CN', {month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : '刚刚';
                         
+                        // 如果到期了，高亮展示艾宾浩斯警告
+                        const timeTagHtml = q.isDue ? 
+                            `<span class="ebbinghaus-alert-badge">🚨 艾宾浩斯第 ${q.diffDays} 天复习点</span>` : 
+                            `<span class="time-badge">⏱️ ${formattedTime}</span>`;
+
                         return `
                             <div class="question-card">
                                 <div class="card-header-meta">
@@ -458,7 +483,7 @@
                                         <span class="badge badge-subject">${q.subject}</span>
                                         <span class="badge badge-status-${q.status}">${statusLabels[q.status]}</span>
                                     </div>
-                                    <span class="time-badge">⏱️ ${formattedTime}</span>
+                                    ${timeTagHtml}
                                 </div>
                                 <h4 style="margin: 8px 0; font-size:16px;">📌 ${q.title}</h4>
                                 
