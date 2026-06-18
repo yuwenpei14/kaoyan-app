@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>研路同行 - 云端同步备考系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #34495e; --accent-color: #e67e22; --success-color: #27ae60;
+            --danger-color: #e74c3c; --warning-color: #f1c40f; --bg-color: #f8f9fa;
+            --card-bg: #ffffff; --text-color: #2c3e50; --border-color: #e2e8f0;
+        }
+        [data-theme="dark"] {
+            --primary-color: #ecf0f1; --accent-color: #f39c12; --success-color: #2ecc71;
+            --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-color: #f5f6fa; --border-color: #404040;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); display: flex; min-height: 100vh; transition: 0.3s; }
+        
+        /* 登录认证界面样式 */
+        .auth-container { display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; background-color: var(--bg-color); }
+        .auth-card { background: var(--card-bg); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); width: 100%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        /* 主系统布局 */
+        .app-container { display: none; width: 100%; min-height: 100vh; }
+        .sidebar { width: 240px; background-color: var(--card-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; gap: 20px; position: fixed; height: 100vh; }
+        .logo { font-size: 20px; font-weight: bold; color: var(--accent-color); text-align: center; padding: 10px 0; border-bottom: 2px solid var(--border-color); }
+        .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        .nav-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .nav-item:hover, .nav-item.active { background-color: var(--accent-color); color: white; }
+        .main-content { margin-left: 240px; flex-grow: 1; padding: 30px; max-width: 1200px; width: calc(100% - 240px); }
+        
+        /* 通用组件 */
+        .countdown-banner { background: linear-gradient(135deg, #2c3e50, #34495e); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; }
+        .timer-display { font-size: 32px; font-weight: bold; color: var(--warning-color); margin-top: 5px; }
+        .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
+        h3 { margin-bottom: 15px; padding-left: 8px; border-left: 4px solid var(--accent-color); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-color); color: var(--text-color); }
+        .btn { background-color: var(--accent-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-inline { width: auto; display: inline-block; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        
+        /* 列表展现 */
+        .checkin-item, .question-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; }
+        .badge { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 4px; color: white; font-weight: bold; margin-right: 5px; }
+        .badge-subject { background-color: #3498db; }
+        .badge-status-0 { background-color: var(--danger-color); }
+        .badge-status-1 { background-color: var(--warning-color); }
+        .badge-status-2 { background-color: var(--success-color); }
+        .q-display-img { max-width: 100%; max-height: 400px; border-radius: 6px; margin-top: 10px; border: 1px solid var(--border-color); cursor: pointer; }
+        .pomo-timer { font-size: 72px; font-weight: bold; text-align: center; margin: 20px 0; font-family: monospace; }
+        
+        /* 移动端/平板适配 */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .main-content { margin-left: 0; padding: 15px; width: 100%; }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        /* 图片放大模态框 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 9999; }
+        .modal img { max-width: 95%; max-height: 95%; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-panel" class="auth-container">
+        <div class="auth-card">
+            <h2 id="auth-title" style="margin-bottom: 20px; text-align: center;">🎯 研路同行云同步版</h2>
+            <div class="form-group">
+                <label>邮箱账号</label>
+                <input type="email" id="auth-email" class="form-control" placeholder="输入你的备考邮箱">
+            </div>
+            <div class="form-group">
+                <label>登录密码</label>
+                <input type="password" id="auth-password" class="form-control" placeholder="输入密码">
+            </div>
+            <button class="btn" id="btn-primary-auth" onclick="handleAuth()">登录 / 进入系统</button>
+            <p id="auth-switch-text" style="text-align:center; margin-top:15px; font-size:13px; color:#7f8c8d; cursor:pointer;" onclick="toggleAuthMode()">还没有账号？点击切换到注册</p>
+        </div>
+    </div>
+
+    <div id="app-panel" class="app-container">
+        <div class="sidebar">
+            <div class="logo">🎯 研路同行 v2.0</div>
+            <ul class="nav-menu">
+                <li class="nav-item active" onclick="switchPage('dashboard')">📊 学习看板</li>
+                <li class="nav-item" onclick="switchPage('checkin')">📅 每日打卡</li>
+                <li class="nav-item" onclick="switchPage('questions')">📓 核心题型</li>
+                <li class="nav-item" onclick="switchPage('pomodoro')">⏱️ 考研番茄钟</li>
+            </ul>
+            <button class="btn btn-danger" style="margin-top:20px; padding:8px;" onclick="handleSignOut()">退出登录</button>
+            <button class="theme-toggle" style="margin-top:auto; padding:10px; background:none; border:1px solid var(--border-color); color:var(--text-color); border-radius:6px; cursor:pointer;" onclick="toggleTheme()">🌓 切换主题</button>
+        </div>
+
+        <div class="main-content">
+            <div class="countdown-banner">
+                <h2>距离全国硕士研究生招生考试初试还有：</h2>
+                <div class="timer-display" id="countdown-timer">计算中...</div>
+            </div>
+
+            <div id="dashboard" class="page active">
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>云端打卡统计</h3>
+                        <p style="font-size: 18px; margin-top: 10px;">已累计打卡：<strong id="stat-checkins" style="color: var(--accent-color); font-size: 28px;">0</strong> 天</p>
+                    </div>
+                    <div class="card">
+                        <h3>核心题型仓库</h3>
+                        <p style="font-size: 18px; margin-top: 10px;">已托管核心题型：<strong id="stat-questions" style="color: #3498db; font-size: 28px;">0</strong> 道</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>每日备考寄语</h3>
+                    <p id="motivational-quote" style="font-style: italic; font-size: 16px; color: #7f8c8d;"></p>
+                </div>
+            </div>
+
+            <div id="checkin" class="page">
+                <div class="card">
+                    <h3>今日打卡感悟</h3>
+                    <div class="form-group">
+                        <textarea id="checkin-mood" class="form-control" placeholder="写下今天的复习进度或心态调适..."></textarea>
+                    </div>
+                    <button class="btn btn-inline" onclick="submitCheckIn()">提交打卡</button>
+                </div>
+                <div class="card">
+                    <h3>历史打卡轴（云端同步）</h3>
+                    <div id="checkin-list-container"></div>
+                </div>
+            </div>
+
+            <div id="questions" class="page">
+                <div class="card">
+                    <h3>收录新题型（支持不限大小原图）</h3>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>科目</label>
+                            <select id="q-subject" class="form-control">
+                                <option value="专业课">专业课</option>
+                                <option value="数学">数学</option>
+                                <option value="英语">英语</option>
+                                <option value="政治">政治</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>掌握状态</label>
+                            <select id="q-status" class="form-control">
+                                <option value="0">完全不会</option>
+                                <option value="1">需重做</option>
+                                <option value="2">已吃透</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>题目/知识点简述</label>
+                        <input type="text" id="q-title" class="form-control" placeholder="基础概念或题型简称">
+                    </div>
+                    <div class="form-group">
+                        <label>核心公式/考点</label>
+                        <input type="text" id="q-formula" class="form-control" placeholder="公式定理核心代号">
+                    </div>
+                    <div class="form-group">
+                        <label>拍照/上传错题原图（直接托管到云存储，不占本地空间）</label>
+                        <input type="file" id="q-image" class="form-control" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>易错点剖析 & 突破口</label>
+                        <textarea id="q-analysis" class="form-control" placeholder="核心思路拆解..."></textarea>
+                    </div>
+                    <button class="btn btn-success btn-inline" id="btn-add-q" onclick="submitQuestion()">云端收录题型</button>
+                </div>
+
+                <div class="card">
+                    <h3>我的云端题型本</h3>
+                    <div class="filters" style="margin-bottom:15px;">
+                        <select id="filter-subject" class="form-control" onchange="fetchQuestions()" style="width:auto; display:inline-block;">
+                            <option value="全部">所有科目</option><option value="专业课">专业课</option><option value="数学">数学</option>
+                        </select>
+                    </div>
+                    <div id="question-list-container"></div>
+                </div>
+            </div>
+
+            <div id="pomodoro" class="page">
+                <div class="card" style="text-align:center;">
+                    <h3>⏱️ 备考专注正计时</h3>
+                    <div class="pomo-timer" id="pomo-display">00:00</div>
+                    <button class="btn btn-success btn-inline" id="pomo-start-btn" onclick="togglePomodoro()">开始专注</button>
+                    <button class="btn btn-danger btn-inline" style="margin-left:10px;" onclick="resetPomodoro()">重置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-modal" class="modal" onclick="this.style.display='none'">
+        <img id="modal-img" src="">
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚠️ 请在此处填入你的 Supabase 密钥凭证 ⚠️
+        // ==========================================
+        const SUPABASE_URL = "https://idbsoqnsakhddvfbrkrm.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_U8MtrIKnq5l7SgDOKJ6G1g_dihPwXeu";
+        
+        // 🌟 修复关键：改名避开 Safari 的全局冲突
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentUser = null;
+        let authMode = "login"; 
+
+        // 认证状态监听
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                currentUser = session.user;
+                document.getElementById('auth-panel').style.display = 'none';
+                document.getElementById('app-panel').style.display = 'flex';
+                initAppData();
+            } else {
+                currentUser = null;
+                document.getElementById('auth-panel').style.display = 'flex';
+                document.getElementById('app-panel').style.display = 'none';
+            }
+        });
+
+        // 登录注册逻辑转换
+        function toggleAuthMode() {
+            authMode = authMode === "login" ? "register" : "login";
+            document.getElementById('auth-title').innerText = authMode === "login" ? "🎯 研路同行云同步版" : "📝 注册新备考账号";
+            document.getElementById('btn-primary-auth').innerText = authMode === "login" ? "登录 / 进入系统" : "立即注册并登录";
+            document.getElementById('auth-switch-text').innerText = authMode === "login" ? "还没有账号？点击切换到注册" : "已有账号？点击切换到登录";
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            if(!email || !password) { alert("请完整填写账号和密码"); return; }
+            
+            if(authMode === "login") {
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if(error) alert("登录失败：" + error.message);
+            } else {
+                const { error } = await supabaseClient.auth.signUp({ email, password });
+                if(error) alert("注册失败：" + error.message);
+                else alert("注册成功！已自动为您登录系统。");
+            }
+        }
+
+        async function handleSignOut() { await supabaseClient.auth.signOut(); }
+
+        function initAppData() {
+            fetchCheckIns();
+            fetchQuestions();
+            updateCountdown();
+            document.getElementById('motivational-quote').innerText = "“ 稳扎稳打，把每一个特征方程、每一行核心公式都吃透，你就是黑马！ ”";
+        }
+
+        function switchPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            const e = window.event;
+            if (e && e.currentTarget) {
+                e.currentTarget.classList.add('active');
+            }
+            if(pageId === 'dashboard') updateStats();
+        }
+
+        // 云端打卡
+        async function submitCheckIn() {
+            const mood = document.getElementById('checkin-mood').value.trim();
+            const todayStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+            
+            const { error } = await supabaseClient.from('checkins').insert([
+                { user_id: currentUser.id, date: todayStr, note: mood || "打卡留念，今天也是全力以赴的备考日！" }
+            ]);
+            if(error) { alert("打卡失败：" + error.message); }
+            else { document.getElementById('checkin-mood').value = ''; fetchCheckIns(); }
+        }
+
+        async function fetchCheckIns() {
+            const { data, error } = await supabaseClient.from('checkins').select('*').order('id', { ascending: false });
+            if(!error && data) {
+                document.getElementById('stat-checkins').innerText = data.length;
+                document.getElementById('checkin-list-container').innerHTML = data.map(c => `
+                    <div class="checkin-item"><strong>${c.date}</strong><p style="margin-top:5px; font-size:14px; opacity:0.85;">📝 ${c.note}</p></div>
+                `).join('');
+            }
+        }
+
+        // 云端错题
+        async function submitQuestion() {
+            const btn = document.getElementById('btn-add-q');
+            const title = document.getElementById('q-title').value.trim();
+            const analysis = document.getElementById('q-analysis').value.trim();
+            const subject = document.getElementById('q-subject').value;
+            const status = parseInt(document.getElementById('q-status').value);
+            const formula = document.getElementById('q-formula').value.trim();
+            const imageFile = document.getElementById('q-image').files[0];
+
+            if(!title || !analysis) { alert("请填写知识点名称和错因分析！"); return; }
+            btn.innerText = "正在安全地上传高清大图到云端...";
+            btn.disabled = true;
+
+            let imageUrl = "";
+            if(imageFile) {
+                const fileExt = imageFile.name.split('.').pop();
+                const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+                const { error: uploadError } = await supabaseClient.storage.from('kaoyan-pics').upload(fileName, imageFile);
+                
+                if(!uploadError) {
+                    const { data } = supabaseClient.storage.from('kaoyan-pics').getPublicUrl(fileName);
+                    imageUrl = data.publicUrl;
+                }
+            }
+
+            const { error } = await supabaseClient.from('questions').insert([{
+                user_id: currentUser.id, subject, status, title, formula, analysis, image_url: imageUrl
+            }]);
+
+            btn.innerText = "云端收录题型"; btn.disabled = false;
+            if(!error) {
+                document.getElementById('q-title').value = ''; document.getElementById('q-formula').value = '';
+                document.getElementById('q-analysis').value = ''; document.getElementById('q-image').value = '';
+                fetchQuestions();
+            }
+        }
+
+        async function fetchQuestions() {
+            const subFilter = document.getElementById('filter-subject').value;
+            let query = supabaseClient.from('questions').select('*').order('id', { ascending: false });
+            if(subFilter !== '全部') query = query.eq('subject', subFilter);
+
+            const { data, error } = await query;
+            if(!error && data) {
+                document.getElementById('stat-questions').innerText = data.length;
+                const statusLabels = ["完全不会", "需重做", "已吃透"];
+                document.getElementById('question-list-container').innerHTML = data.map(q => `
+                    <div class="question-card">
+                        <div>
+                            <span class="badge badge-subject">${q.subject}</span>
+                            <span class="badge badge-status-${q.status}">${statusLabels[q.status]}</span>
+                        </div>
+                        <h4 style="margin: 8px 0;">📌 ${q.title}</h4>
+                        ${q.image_url ? `<img src="${q.image_url}" class="q-display-img" onclick="zoomImage('${q.image_url}')">` : ''}
+                        ${q.formula ? `<p style="background:var(--bg-color); padding:6px; font-family:monospace; margin:8px 0; font-size:13px; border-left:3px solid var(--accent-color)"><strong>考点/公式:</strong> ${q.formula}</p>` : ''}
+                        <p style="font-size:14px; white-space:pre-wrap; margin-top:8px;"><strong>💡 突破口:</strong><br>${q.analysis}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function zoomImage(url) {
+            document.getElementById('modal-img').src = url;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        async function updateStats() {
+            const { data: cData } = await supabaseClient.from('checkins').select('id');
+            const { data: qData } = await supabaseClient.from('questions').select('id');
+            if(cData) document.getElementById('stat-checkins').innerText = cData.length;
+            if(qData) document.getElementById('stat-questions').innerText = qData.length;
+        }
+
+        let pomoInterval; let pomoMinutes = 0; let pomoSeconds = 0; let isPomoRunning = false;
+        function togglePomodoro() {
+            const btn = document.getElementById('pomo-start-btn');
+            if (isPomoRunning) { clearInterval(pomoInterval); isPomoRunning = false; btn.innerText = "继续专注"; }
+            else { isPomoRunning = true; btn.innerText = "暂停计时"; pomoInterval = setInterval(pomoTick, 1000); }
+        }
+        function pomoTick() {
+            pomoSeconds++; if (pomoSeconds === 60) { pomoSeconds = 0; pomoMinutes++; }
+            document.getElementById('pomo-display').innerText = `${pomoMinutes<10?'0'+pomoMinutes:pomoMinutes}:${pomoSeconds<10?'0'+pomoSeconds:pomoSeconds}`;
+        }
+        function resetPomodoro() { clearInterval(pomoInterval); isPomoRunning = false; pomoMinutes = 0; pomoSeconds = 0; document.getElementById('pomo-start-btn').innerText = "开始专注"; document.getElementById('pomo-display').innerText = "00:00"; }
+        function toggleTheme() {
+            const body = document.body;
+            if (body.getAttribute('data-theme') === 'dark') { body.removeAttribute('data-theme'); localStorage.setItem('kaoyan_theme', 'light'); }
+            else { body.setAttribute('data-theme', 'dark'); localStorage.setItem('kaoyan_theme', 'dark'); }
+        }
+        function updateCountdown() {
+            const currentYear = new Date().getFullYear();
+            const targetDate = new Date(`December 26, ${currentYear} 08:30:00`).getTime();
+            const now = new Date().getTime(); const difference = targetDate - now;
+            if (difference < 0) { document.getElementById("countdown-timer").innerHTML = "考试顺利，旗开得胜！"; return; }
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+            document.getElementById("countdown-timer").innerHTML = `${days} 天 ${hours} 小时 ${minutes} 分钟 ${seconds} 秒`;
+        }
+        window.onload = function() { 
+            if (localStorage.getItem('kaoyan_theme') === 'dark') document.body.setAttribute('data-theme', 'dark'); 
+            setInterval(updateCountdown, 1000);
+            updateCountdown();
+        };
+    </script>
+</body>
+</html>
