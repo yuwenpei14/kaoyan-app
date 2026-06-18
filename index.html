@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>研路同行 - 云端同步备考系统</title>
+    <title>研路同行 - 考研全设备云同步系统 v2.2</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -18,52 +18,71 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); display: flex; min-height: 100vh; transition: 0.3s; }
         
-        /* 登录认证界面样式 */
+        /* 登录认证面板 */
         .auth-container { display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; background-color: var(--bg-color); }
         .auth-card { background: var(--card-bg); padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); width: 100%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         
         /* 主系统布局 */
         .app-container { display: none; width: 100%; min-height: 100vh; }
-        .sidebar { width: 240px; background-color: var(--card-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; gap: 20px; position: fixed; height: 100vh; }
+        .sidebar { width: 240px; background-color: var(--card-bg); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; gap: 20px; position: fixed; height: 100vh; z-index: 100; }
         .logo { font-size: 20px; font-weight: bold; color: var(--accent-color); text-align: center; padding: 10px 0; border-bottom: 2px solid var(--border-color); }
         .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-        .nav-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-weight: 500; }
-        .nav-item:hover, .nav-item.active { background-color: var(--accent-color); color: white; }
+        .nav-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-weight: 500; color: var(--text-color); }
+        .nav-item:hover, .nav-item.active { background-color: var(--accent-color) !important; color: white !important; }
         .main-content { margin-left: 240px; flex-grow: 1; padding: 30px; max-width: 1200px; width: calc(100% - 240px); }
         
-        /* 通用组件 */
+        /* 页面显示与隐藏 */
+        .page { display: none !important; }
+        .page.active { display: block !important; }
+        
+        /* 组件样式 */
         .countdown-banner { background: linear-gradient(135deg, #2c3e50, #34495e); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; }
-        .timer-display { font-size: 32px; font-weight: bold; color: var(--warning-color); margin-top: 5px; }
+        .timer-display { font-size: 30px; font-weight: bold; color: var(--warning-color); margin-top: 5px; }
         .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 25px; }
-        h3 { margin-bottom: 15px; padding-left: 8px; border-left: 4px solid var(--accent-color); }
+        h3 { margin-bottom: 15px; padding-left: 8px; border-left: 4px solid var(--accent-color); font-size: 18px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
         .form-control { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-color); color: var(--text-color); }
-        .btn { background-color: var(--accent-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
-        .btn-inline { width: auto; display: inline-block; }
+        .btn { background-color: var(--accent-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: center; }
+        .btn:hover { opacity: 0.9; }
+        .btn-success { background-color: var(--success-color); }
+        .btn-danger { background-color: var(--danger-color); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         
-        /* 列表展现 */
-        .checkin-item, .question-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; }
+        .progress-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border-color); }
+        .todo-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 15px; }
+        .todo-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .todo-done { text-decoration: line-through; opacity: 0.5; }
+
+        /* 📓 题型卡片样式 */
+        .question-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; margin-bottom: 20px; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .card-header-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
         .badge { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 4px; color: white; font-weight: bold; margin-right: 5px; }
         .badge-subject { background-color: #3498db; }
         .badge-status-0 { background-color: var(--danger-color); }
         .badge-status-1 { background-color: var(--warning-color); }
         .badge-status-2 { background-color: var(--success-color); }
-        .q-display-img { max-width: 100%; max-height: 400px; border-radius: 6px; margin-top: 10px; border: 1px solid var(--border-color); cursor: pointer; }
-        .pomo-timer { font-size: 72px; font-weight: bold; text-align: center; margin: 20px 0; font-family: monospace; }
         
-        /* 移动端/平板适配 */
+        .time-badge { font-size: 12px; color: #7f8c8d; font-weight: 500; background: var(--bg-color); padding: 3px 8px; border-radius: 20px; }
+        
+        .image-wrapper { background: var(--bg-color); padding: 8px; border-radius: 8px; margin: 12px 0; display: inline-block; max-width: 100%; border: 1px dashed var(--border-color); }
+        .q-display-img { max-width: 100%; max-height: 350px; border-radius: 6px; cursor: zoom-in; display: block; transition: transform 0.2s; }
+        .q-display-img:hover { transform: scale(1.01); }
+        
+        .pomo-timer { font-size: 80px; font-weight: bold; text-align: center; margin: 30px 0; font-family: monospace; color: var(--accent-color); }
+        .checkin-item { padding: 12px; border-bottom: 1px solid var(--border-color); }
+
         @media (max-width: 768px) {
             body { flex-direction: column; }
-            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-color); padding: 15px; gap: 10px; }
             .main-content { margin-left: 0; padding: 15px; width: 100%; }
             .grid-2 { grid-template-columns: 1fr; }
+            .nav-menu { flex-direction: row; flex-wrap: wrap; gap: 5px; }
+            .nav-item { padding: 8px 12px; font-size: 14px; }
         }
 
-        /* 图片放大模态框 */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 9999; }
-        .modal img { max-width: 95%; max-height: 95%; border-radius: 8px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 999999; cursor: zoom-out; }
+        .modal img { max-width: 95%; max-height: 95%; border-radius: 4px; box-shadow: 0 4px 30px rgba(0,0,0,0.7); object-fit: contain; }
     </style>
 </head>
 <body>
@@ -79,22 +98,22 @@
                 <label>登录密码</label>
                 <input type="password" id="auth-password" class="form-control" placeholder="输入密码">
             </div>
-            <button class="btn" id="btn-primary-auth" onclick="handleAuth()">登录 / 进入系统</button>
+            <button class="btn" style="width:100%;" id="btn-primary-auth" onclick="handleAuth()">登录 / 进入系统</button>
             <p id="auth-switch-text" style="text-align:center; margin-top:15px; font-size:13px; color:#7f8c8d; cursor:pointer;" onclick="toggleAuthMode()">还没有账号？点击切换到注册</p>
         </div>
     </div>
 
     <div id="app-panel" class="app-container">
         <div class="sidebar">
-            <div class="logo">🎯 研路同行 v2.0</div>
+            <div class="logo">🎯 研路同行 v2.2</div>
             <ul class="nav-menu">
-                <li class="nav-item active" onclick="switchPage('dashboard')">📊 学习看板</li>
-                <li class="nav-item" onclick="switchPage('checkin')">📅 每日打卡</li>
-                <li class="nav-item" onclick="switchPage('questions')">📓 核心题型</li>
-                <li class="nav-item" onclick="switchPage('pomodoro')">⏱️ 考研番茄钟</li>
+                <li class="nav-item active" onclick="switchPage('dashboard', this)">📊 学习看板</li>
+                <li class="nav-item" onclick="switchPage('checkin', this)">📅 每日打卡</li>
+                <li class="nav-item" onclick="switchPage('questions', this)">📓 核心题型</li>
+                <li class="nav-item" onclick="switchPage('pomodoro', this)">⏱️ 考研番茄钟</li>
             </ul>
-            <button class="btn btn-danger" style="margin-top:20px; padding:8px;" onclick="handleSignOut()">退出登录</button>
-            <button class="theme-toggle" style="margin-top:auto; padding:10px; background:none; border:1px solid var(--border-color); color:var(--text-color); border-radius:6px; cursor:pointer;" onclick="toggleTheme()">🌓 切换主题</button>
+            <button class="btn btn-danger" style="margin-top:10px; padding:6px; font-size:13px;" onclick="handleSignOut()">退出登录</button>
+            <button class="theme-toggle" style="margin-top:auto; padding:8px; background:none; border:1px solid var(--border-color); color:var(--text-color); border-radius:6px; cursor:pointer; font-size:13px;" onclick="toggleTheme()">🌓 切换主题</button>
         </div>
 
         <div class="main-content">
@@ -107,39 +126,72 @@
                 <div class="grid-2">
                     <div class="card">
                         <h3>云端打卡统计</h3>
-                        <p style="font-size: 18px; margin-top: 10px;">已累计打卡：<strong id="stat-checkins" style="color: var(--accent-color); font-size: 28px;">0</strong> 天</p>
+                        <p style="font-size: 16px; margin-top: 5px;">已累计打卡：<strong id="stat-checkins" style="color: var(--accent-color); font-size: 26px;">0</strong> 天</p>
                     </div>
                     <div class="card">
                         <h3>核心题型仓库</h3>
-                        <p style="font-size: 18px; margin-top: 10px;">已托管核心题型：<strong id="stat-questions" style="color: #3498db; font-size: 28px;">0</strong> 道</p>
+                        <p style="font-size: 16px; margin-top: 5px;">已托管重难点：<strong id="stat-questions" style="color: #3498db; font-size: 26px;">0</strong> 道</p>
                     </div>
                 </div>
+
                 <div class="card">
-                    <h3>每日备考寄语</h3>
-                    <p id="motivational-quote" style="font-style: italic; font-size: 16px; color: #7f8c8d;"></p>
+                    <h3>🧭 考研各科复习大纲轮次管理</h3>
+                    <div class="progress-row">
+                        <strong>📖 高等数学 / 线性代数</strong>
+                        <select id="stage-math" class="form-control" style="width:160px;" onchange="saveStages()">
+                            <option value="一轮基础扎实中">一轮基础扎实中</option>
+                            <option value="二轮题型强化刷题">二轮题型强化刷题</option>
+                            <option value="三轮真题模拟冲刺">三轮真题模拟冲刺</option>
+                        </select>
+                    </div>
+                    <div class="progress-row">
+                        <strong>🛠️ 专业课 (控制工程/自控原理等)</strong>
+                        <select id="stage-major" class="form-control" style="width:160px;" onchange="saveStages()">
+                            <option value="一轮核心概念攻克">一轮核心概念攻克</option>
+                            <option value="二轮经典大题死磕">二轮经典大题死磕</option>
+                            <option value="三轮历年真题模考">三轮历年真题模考</option>
+                        </select>
+                    </div>
+                    <div class="progress-row">
+                        <strong>🇬🇧 考研英语 (长难句/真题阅读)</strong>
+                        <select id="stage-english" class="form-control" style="width:160px;" onchange="saveStages()">
+                            <option value="单词高频记忆中">单词高频记忆中</option>
+                            <option value="真题精读与错题剖析">真题精读与错题剖析</option>
+                            <option value="作文模板背诵与练笔">作文模板背诵与练笔</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📋 今日备考核心任务清单</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="todo-input" class="form-control" placeholder="输入今天必须啃下的复习任务...">
+                        <button class="btn btn-success" style="white-space:nowrap;" onclick="addTodo()">添加任务</button>
+                    </div>
+                    <div id="todo-list-container"></div>
                 </div>
             </div>
 
             <div id="checkin" class="page">
                 <div class="card">
-                    <h3>今日打卡感悟</h3>
+                    <h3>今日备考复习感悟</h3>
                     <div class="form-group">
-                        <textarea id="checkin-mood" class="form-control" placeholder="写下今天的复习进度或心态调适..."></textarea>
+                        <textarea id="checkin-mood" class="form-control" style="height:120px;" placeholder="写下今天的复习进度或心态调适..."></textarea>
                     </div>
-                    <button class="btn btn-inline" onclick="submitCheckIn()">提交打卡</button>
+                    <button class="btn" style="width:auto;" onclick="submitCheckIn()">提交云端打卡</button>
                 </div>
                 <div class="card">
-                    <h3>历史打卡轴（云端同步）</h3>
+                    <h3>历史打卡时间轴</h3>
                     <div id="checkin-list-container"></div>
                 </div>
             </div>
 
             <div id="questions" class="page">
                 <div class="card">
-                    <h3>收录新题型（支持不限大小原图）</h3>
+                    <h3>新增重难点 / 错题真题收录</h3>
                     <div class="grid-2">
                         <div class="form-group">
-                            <label>科目</label>
+                            <label>所属科目</label>
                             <select id="q-subject" class="form-control">
                                 <option value="专业课">专业课</option>
                                 <option value="数学">数学</option>
@@ -148,57 +200,71 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>掌握状态</label>
+                            <label>当前掌握状态</label>
                             <select id="q-status" class="form-control">
-                                <option value="0">完全不会</option>
-                                <option value="1">需重做</option>
-                                <option value="2">已吃透</option>
+                                <option value="0">完全不会（需要高频死磕）</option>
+                                <option value="1">需重做（解题步骤易错）</option>
+                                <option value="2">已吃透（闭眼都能推导）</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>题目/知识点简述</label>
-                        <input type="text" id="q-title" class="form-control" placeholder="基础概念或题型简称">
+                        <label>重难点题目 / 知识点简称</label>
+                        <input type="text" id="q-title" class="form-control" placeholder="输入题目简介...">
                     </div>
                     <div class="form-group">
-                        <label>核心公式/考点</label>
-                        <input type="text" id="q-formula" class="form-control" placeholder="公式定理核心代号">
+                        <label>核心公式 / 核心关键点</label>
+                        <input type="text" id="q-formula" class="form-control" placeholder="输入公式关键定理...">
                     </div>
                     <div class="form-group">
-                        <label>拍照/上传错题原图（直接托管到云存储，不占本地空间）</label>
+                        <label>上传错题、手写推导过程截图（不限大小）</label>
                         <input type="file" id="q-image" class="form-control" accept="image/*">
                     </div>
                     <div class="form-group">
-                        <label>易错点剖析 & 突破口</label>
-                        <textarea id="q-analysis" class="form-control" placeholder="核心思路拆解..."></textarea>
+                        <label>错因剖析 / 核心解题突破口</label>
+                        <textarea id="q-analysis" class="form-control" style="height:120px;" placeholder="详细记录思路陷阱..."></textarea>
                     </div>
-                    <button class="btn btn-success btn-inline" id="btn-add-q" onclick="submitQuestion()">云端收录题型</button>
+                    <button class="btn btn-success" id="btn-add-q" style="width:auto;" onclick="submitQuestion()">安全托管至云端题型本</button>
                 </div>
 
                 <div class="card">
-                    <h3>我的云端题型本</h3>
-                    <div class="filters" style="margin-bottom:15px;">
-                        <select id="filter-subject" class="form-control" onchange="fetchQuestions()" style="width:auto; display:inline-block;">
-                            <option value="全部">所有科目</option><option value="专业课">专业课</option><option value="数学">数学</option>
+                    <h3>我的云端题型本（支持科目与时间双重交叉筛选）</h3>
+                    
+                    <div class="filters" style="margin-bottom:20px; display: flex; gap: 10px;">
+                        <select id="filter-subject" class="form-control" onchange="fetchQuestions()" style="width:auto;">
+                            <option value="全部">所有科目</option>
+                            <option value="专业课">专业课</option>
+                            <option value="数学">数学</option>
+                            <option value="英语">英语</option>
+                            <option value="政治">政治</option>
+                        </select>
+                        
+                        <select id="filter-time" class="form-control" onchange="fetchQuestions()" style="width:auto;">
+                            <option value="全部">全部时间</option>
+                            <option value="今天">今天收录</option>
+                            <option value="近三天">近 3 天</option>
+                            <option value="近一周">近一周</option>
+                            <option value="近一月">近一月</option>
                         </select>
                     </div>
+                    
                     <div id="question-list-container"></div>
                 </div>
             </div>
 
             <div id="pomodoro" class="page">
-                <div class="card" style="text-align:center;">
-                    <h3>⏱️ 备考专注正计时</h3>
+                <div class="card" style="text-align:center; padding:40px 20px;">
+                    <h3>⏱️ 备考专注正计时（不打断心流）</h3>
                     <div class="pomo-timer" id="pomo-display">00:00</div>
-                    <button class="btn btn-success btn-inline" id="pomo-start-btn" onclick="togglePomodoro()">开始专注</button>
-                    <button class="btn btn-danger btn-inline" style="margin-left:10px;" onclick="resetPomodoro()">重置</button>
+                    <button class="btn btn-success" style="width:auto; padding:12px 30px;" id="pomo-start-btn" onclick="togglePomodoro()">开始专注</button>
+                    <button class="btn btn-danger" style="width:auto; padding:12px 30px; margin-left:10px;" onclick="resetPomodoro()">重置计时</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="image-modal" class="modal" onclick="this.style.display='none'">
-        <img id="modal-img" src="">
+        <img id="modal-img" src="" alt="大图查看">
     </div>
 
     <script>
@@ -208,12 +274,10 @@
         const SUPABASE_URL = "https://idbsoqnsakhddvfbrkrm.supabase.co"; 
         const SUPABASE_KEY = "sb_publishable_U8MtrIKnq5l7SgDOKJ6G1g_dihPwXeu";
         
-        // 🌟 修复关键：改名避开 Safari 的全局冲突
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentUser = null;
         let authMode = "login"; 
 
-        // 认证状态监听
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (session) {
                 currentUser = session.user;
@@ -227,7 +291,6 @@
             }
         });
 
-        // 登录注册逻辑转换
         function toggleAuthMode() {
             authMode = authMode === "login" ? "register" : "login";
             document.getElementById('auth-title').innerText = authMode === "login" ? "🎯 研路同行云同步版" : "📝 注册新备考账号";
@@ -239,61 +302,64 @@
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value.trim();
             if(!email || !password) { alert("请完整填写账号和密码"); return; }
-            
-            if(authMode === "login") {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if(error) alert("登录失败：" + error.message);
-            } else {
-                const { error } = await supabaseClient.auth.signUp({ email, password });
-                if(error) alert("注册失败：" + error.message);
-                else alert("注册成功！已自动为您登录系统。");
-            }
+            try {
+                if(authMode === "login") {
+                    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                    if(error) alert("登录失败：" + error.message);
+                } else {
+                    const { error } = await supabaseClient.auth.signUp({ email, password });
+                    if(error) alert("注册失败：" + error.message);
+                    else alert("注册成功！已自动登录。");
+                }
+            } catch(e) { alert("网络连接异常"); }
         }
 
         async function handleSignOut() { await supabaseClient.auth.signOut(); }
 
-        function initAppData() {
-            fetchCheckIns();
-            fetchQuestions();
-            updateCountdown();
-            document.getElementById('motivational-quote').innerText = "“ 稳扎稳打，把每一个特征方程、每一行核心公式都吃透，你就是黑马！ ”";
-        }
-
-        function switchPage(pageId) {
+        function switchPage(pageId, element) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
             
-            const e = window.event;
-            if (e && e.currentTarget) {
-                e.currentTarget.classList.add('active');
-            }
+            const targetPage = document.getElementById(pageId);
+            if(targetPage) targetPage.classList.add('active');
+            if(element) element.classList.add('active');
+            
             if(pageId === 'dashboard') updateStats();
         }
 
-        // 云端打卡
+        function initAppData() {
+            fetchCheckIns();
+            fetchQuestions();
+            loadStages();
+            renderTodos();
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
         async function submitCheckIn() {
             const mood = document.getElementById('checkin-mood').value.trim();
             const todayStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-            
-            const { error } = await supabaseClient.from('checkins').insert([
-                { user_id: currentUser.id, date: todayStr, note: mood || "打卡留念，今天也是全力以赴的备考日！" }
-            ]);
-            if(error) { alert("打卡失败：" + error.message); }
-            else { document.getElementById('checkin-mood').value = ''; fetchCheckIns(); }
+            try {
+                const { error } = await supabaseClient.from('checkins').insert([
+                    { user_id: currentUser.id, date: todayStr, note: mood || "打卡留念，全力以赴！" }
+                ]);
+                if(error) alert("打卡失败：" + error.message);
+                else { document.getElementById('checkin-mood').value = ''; fetchCheckIns(); }
+            } catch(e){}
         }
 
         async function fetchCheckIns() {
-            const { data, error } = await supabaseClient.from('checkins').select('*').order('id', { ascending: false });
-            if(!error && data) {
-                document.getElementById('stat-checkins').innerText = data.length;
-                document.getElementById('checkin-list-container').innerHTML = data.map(c => `
-                    <div class="checkin-item"><strong>${c.date}</strong><p style="margin-top:5px; font-size:14px; opacity:0.85;">📝 ${c.note}</p></div>
-                `).join('');
-            }
+            try {
+                const { data, error } = await supabaseClient.from('checkins').select('*').order('id', { ascending: false });
+                if(!error && data) {
+                    document.getElementById('stat-checkins').innerText = data.length;
+                    document.getElementById('checkin-list-container').innerHTML = data.map(c => `
+                        <div class="checkin-item"><strong>📅 ${c.date}</strong><p style="margin-top:5px; font-size:14px; opacity:0.85;">${c.note}</p></div>
+                    `).join('');
+                }
+            } catch(e){}
         }
 
-        // 云端错题
         async function submitQuestion() {
             const btn = document.getElementById('btn-add-q');
             const title = document.getElementById('q-title').value.trim();
@@ -303,56 +369,111 @@
             const formula = document.getElementById('q-formula').value.trim();
             const imageFile = document.getElementById('q-image').files[0];
 
-            if(!title || !analysis) { alert("请填写知识点名称和错因分析！"); return; }
-            btn.innerText = "正在安全地上传高清大图到云端...";
+            if(!title || !analysis) { alert("请务必填写题目简称和错因剖析！"); return; }
+            btn.innerText = "⚡ 正在向公网安全托管高清大图...";
             btn.disabled = true;
 
-            let imageUrl = "";
-            if(imageFile) {
-                const fileExt = imageFile.name.split('.').pop();
-                const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
-                const { error: uploadError } = await supabaseClient.storage.from('kaoyan-pics').upload(fileName, imageFile);
-                
-                if(!uploadError) {
-                    const { data } = supabaseClient.storage.from('kaoyan-pics').getPublicUrl(fileName);
-                    imageUrl = data.publicUrl;
+            try {
+                let imageUrl = "";
+                if(imageFile) {
+                    const fileExt = imageFile.name.split('.').pop();
+                    const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+                    const { error: uploadError } = await supabaseClient.storage.from('kaoyan-pics').upload(fileName, imageFile);
+                    
+                    if(!uploadError) {
+                        const { data } = supabaseClient.storage.from('kaoyan-pics').getPublicUrl(fileName);
+                        imageUrl = data.publicUrl;
+                    } else {
+                        alert("🔴 图片上传失败，原因：" + uploadError.message);
+                    }
                 }
-            }
 
-            const { error } = await supabaseClient.from('questions').insert([{
-                user_id: currentUser.id, subject, status, title, formula, analysis, image_url: imageUrl
-            }]);
+                const { error } = await supabaseClient.from('questions').insert([{
+                    user_id: currentUser.id, subject, status, title, formula, analysis, image_url: imageUrl
+                }]);
 
-            btn.innerText = "云端收录题型"; btn.disabled = false;
-            if(!error) {
-                document.getElementById('q-title').value = ''; document.getElementById('q-formula').value = '';
-                document.getElementById('q-analysis').value = ''; document.getElementById('q-image').value = '';
-                fetchQuestions();
-            }
+                if(error) { alert("收录失败：" + error.message); }
+                else {
+                    document.getElementById('q-title').value = ''; document.getElementById('q-formula').value = '';
+                    document.getElementById('q-analysis').value = ''; document.getElementById('q-image').value = '';
+                    alert("🎉 错题和高清照片已成功同步存储至云端！");
+                    fetchQuestions();
+                }
+            } catch(e) { alert("上传发生异常"); }
+            finally { btn.innerText = "云端收录题型"; btn.disabled = false; }
         }
 
+        // 🌟 核心升级：科目与时间跨度双重交叉查询函数
         async function fetchQuestions() {
-            const subFilter = document.getElementById('filter-subject').value;
-            let query = supabaseClient.from('questions').select('*').order('id', { ascending: false });
-            if(subFilter !== '全部') query = query.eq('subject', subFilter);
+            try {
+                const subFilter = document.getElementById('filter-subject').value;
+                const timeFilter = document.getElementById('filter-time').value;
+                
+                // 初始化查询：按云端时间戳降序排列
+                let query = supabaseClient.from('questions').select('*').order('created_at', { ascending: false });
+                
+                // 1. 处理【科目】筛选条件
+                if(subFilter !== '全部') {
+                    query = query.eq('subject', subFilter);
+                }
+                
+                // 2. 处理【时间段】范围筛选条件
+                if(timeFilter !== '全部') {
+                    const now = new Date();
+                    if(timeFilter === '今天') {
+                        now.setHours(0,0,0,0); // 今天的 00:00:00 之后
+                        query = query.gte('created_at', now.toISOString());
+                    } else if(timeFilter === '近三天') {
+                        const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+                        query = query.gte('created_at', cutoff.toISOString());
+                    } else if(timeFilter === '近一周') {
+                        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                        query = query.gte('created_at', cutoff.toISOString());
+                    } else if(timeFilter === '近一月') {
+                        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                        query = query.gte('created_at', cutoff.toISOString());
+                    }
+                }
 
-            const { data, error } = await query;
-            if(!error && data) {
-                document.getElementById('stat-questions').innerText = data.length;
-                const statusLabels = ["完全不会", "需重做", "已吃透"];
-                document.getElementById('question-list-container').innerHTML = data.map(q => `
-                    <div class="question-card">
-                        <div>
-                            <span class="badge badge-subject">${q.subject}</span>
-                            <span class="badge badge-status-${q.status}">${statusLabels[q.status]}</span>
-                        </div>
-                        <h4 style="margin: 8px 0;">📌 ${q.title}</h4>
-                        ${q.image_url ? `<img src="${q.image_url}" class="q-display-img" onclick="zoomImage('${q.image_url}')">` : ''}
-                        ${q.formula ? `<p style="background:var(--bg-color); padding:6px; font-family:monospace; margin:8px 0; font-size:13px; border-left:3px solid var(--accent-color)"><strong>考点/公式:</strong> ${q.formula}</p>` : ''}
-                        <p style="font-size:14px; white-space:pre-wrap; margin-top:8px;"><strong>💡 突破口:</strong><br>${q.analysis}</p>
-                    </div>
-                `).join('');
-            }
+                const { data, error } = await query;
+                if(!error && data) {
+                    document.getElementById('stat-questions').innerText = data.length;
+                    const statusLabels = ["完全不会", "需重做", "已吃透"];
+                    
+                    // 无数据状态兜底友情提示
+                    if(data.length === 0) {
+                        document.getElementById('question-list-container').innerHTML = `
+                            <p style="color:#7f8c8d; font-size:14px; text-align:center; padding: 30px 0;">📭 没有在这个时间段找到符合该科目的云端错题。</p>
+                        `;
+                        return;
+                    }
+                    
+                    document.getElementById('question-list-container').innerHTML = data.map(q => {
+                        const formattedTime = q.created_at ? new Date(q.created_at).toLocaleString('zh-CN', {month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'}) : '刚刚';
+                        
+                        return `
+                            <div class="question-card">
+                                <div class="card-header-meta">
+                                    <div>
+                                        <span class="badge badge-subject">${q.subject}</span>
+                                        <span class="badge badge-status-${q.status}">${statusLabels[q.status]}</span>
+                                    </div>
+                                    <span class="time-badge">⏱️ ${formattedTime}</span>
+                                </div>
+                                <h4 style="margin: 8px 0; font-size:16px;">📌 ${q.title}</h4>
+                                
+                                ${q.image_url ? `
+                                <div class="image-wrapper">
+                                    <img src="${q.image_url}" class="q-display-img" onclick="zoomImage('${q.image_url}')" title="点击展开无损大图">
+                                </div>` : ''}
+                                
+                                ${q.formula ? `<p style="background:var(--bg-color); padding:8px; font-family:monospace; margin:10px 0; font-size:13px; border-left:3px solid var(--accent-color)"><strong>考点/公式:</strong> ${q.formula}</p>` : ''}
+                                <p style="font-size:14px; white-space:pre-wrap; margin-top:10px; line-height:1.6;"><strong>💡 错因与突破口：</strong><br>${q.analysis}</p>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch(e){}
         }
 
         function zoomImage(url) {
@@ -361,23 +482,76 @@
         }
 
         async function updateStats() {
-            const { data: cData } = await supabaseClient.from('checkins').select('id');
-            const { data: qData } = await supabaseClient.from('questions').select('id');
-            if(cData) document.getElementById('stat-checkins').innerText = cData.length;
-            if(qData) document.getElementById('stat-questions').innerText = qData.length;
+            try {
+                const { data: cData } = await supabaseClient.from('checkins').select('id');
+                const { data: qData } = await supabaseClient.from('questions').select('id');
+                if(cData) document.getElementById('stat-checkins').innerText = cData.length;
+                if(qData) document.getElementById('stat-questions').innerText = qData.length;
+            } catch(e){}
+        }
+
+        function saveStages() {
+            const stages = {
+                math: document.getElementById('stage-math').value,
+                major: document.getElementById('stage-major').value,
+                english: document.getElementById('stage-english').value
+            };
+            localStorage.setItem('kaoyan_stages_' + currentUser.id, JSON.stringify(stages));
+        }
+        function loadStages() {
+            const saved = localStorage.getItem('kaoyan_stages_' + currentUser.id);
+            if(saved) {
+                const stages = JSON.parse(saved);
+                document.getElementById('stage-math').value = stages.math || "一轮基础扎实中";
+                document.getElementById('stage-major').value = stages.major || "一轮核心概念攻克";
+                document.getElementById('stage-english').value = stages.english || "单词高频记忆中";
+            }
+        }
+
+        let todoList = [];
+        function addTodo() {
+            const input = document.getElementById('todo-input');
+            const text = input.value.trim();
+            if(!text) return;
+            todoList.push({ id: Date.now(), text: text, done: false });
+            input.value = '';
+            saveTodos(); renderTodos();
+        }
+        function toggleTodo(id) {
+            todoList = todoList.map(t => t.id === id ? { ...t, done: !t.done } : t);
+            saveTodos(); renderTodos();
+        }
+        function deleteTodo(id) {
+            todoList = todoList.filter(t => t.id !== id);
+            saveTodos(); renderTodos();
+        }
+        function saveTodos() { localStorage.setItem('kaoyan_todos_' + currentUser.id, JSON.stringify(todoList)); }
+        function renderTodos() {
+            const saved = localStorage.getItem('kaoyan_todos_' + currentUser.id);
+            todoList = saved ? JSON.parse(saved) : [];
+            const container = document.getElementById('todo-list-container');
+            if(todoList.length === 0) { container.innerHTML = '<p style="color:#7f8c8d; font-size:14px; text-align:center;">今日暂无紧迫核心任务，快去添加吧！</p>'; return; }
+            container.innerHTML = todoList.map(t => `
+                <div class="todo-item">
+                    <input type="checkbox" ${t.done?'checked':''} onclick="toggleTodo(${t.id})">
+                    <span class="${t.done?'todo-done':''}" style="flex-grow:1;">${t.text}</span>
+                    <span style="color:var(--danger-color); cursor:pointer; font-size:13px;" onclick="deleteTodo(${t.id})">❌</span>
+                </div>
+            `).join('');
         }
 
         let pomoInterval; let pomoMinutes = 0; let pomoSeconds = 0; let isPomoRunning = false;
         function togglePomodoro() {
             const btn = document.getElementById('pomo-start-btn');
-            if (isPomoRunning) { clearInterval(pomoInterval); isPomoRunning = false; btn.innerText = "继续专注"; }
-            else { isPomoRunning = true; btn.innerText = "暂停计时"; pomoInterval = setInterval(pomoTick, 1000); }
+            if (isPomoRunning) { clearInterval(pomoInterval); isPomoRunning = false; btn.innerText = "继续专注"; btn.style.backgroundColor = "var(--success-color)"; }
+            else { isPomoRunning = true; btn.innerText = "暂停计时"; btn.style.backgroundColor = "var(--warning-color)"; pomoInterval = setInterval(pomoTick, 1000); }
         }
         function pomoTick() {
             pomoSeconds++; if (pomoSeconds === 60) { pomoSeconds = 0; pomoMinutes++; }
             document.getElementById('pomo-display').innerText = `${pomoMinutes<10?'0'+pomoMinutes:pomoMinutes}:${pomoSeconds<10?'0'+pomoSeconds:pomoSeconds}`;
         }
-        function resetPomodoro() { clearInterval(pomoInterval); isPomoRunning = false; pomoMinutes = 0; pomoSeconds = 0; document.getElementById('pomo-start-btn').innerText = "开始专注"; document.getElementById('pomo-display').innerText = "00:00"; }
+        function resetPomodoro() { clearInterval(pomoInterval); isPomoRunning = false; pomoMinutes = 0; pomoSeconds = 0; document.getElementById('pomo-start-btn').innerText = "开始专注"; document.getElementById('pomo-start-btn').style.backgroundColor = "var(--success-color)"; document.getElementById('pomo-display').innerText = "00:00"; }
+        
         function toggleTheme() {
             const body = document.body;
             if (body.getAttribute('data-theme') === 'dark') { body.removeAttribute('data-theme'); localStorage.setItem('kaoyan_theme', 'light'); }
@@ -387,7 +561,7 @@
             const currentYear = new Date().getFullYear();
             const targetDate = new Date(`December 26, ${currentYear} 08:30:00`).getTime();
             const now = new Date().getTime(); const difference = targetDate - now;
-            if (difference < 0) { document.getElementById("countdown-timer").innerHTML = "考试顺利，旗开得胜！"; return; }
+            if (difference < 0) { document.getElementById("countdown-timer").innerHTML = "轻舟已过万重山，祝金榜题名！"; return; }
             const days = Math.floor(difference / (1000 * 60 * 60 * 24));
             const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
